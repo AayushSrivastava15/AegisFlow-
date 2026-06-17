@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { Product, Client, License, ActivityLog, FirebaseConfig } from '../types';
 import { initialProducts, initialClients, initialLicenses, initialLogs } from '../data/mockData';
+import { getFirebaseInstance } from '../lib/firebase';
+import { doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 interface LicenseState {
   products: Product[];
@@ -12,11 +14,11 @@ interface LicenseState {
   // Actions
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'clientCount' | 'licenseCount'>) => void;
   addClient: (client: Omit<Client, 'id' | 'joinedAt' | 'activeLicenses' | 'totalLicenses'>) => void;
-  generateLicense: (license: Omit<License, 'id' | 'key' | 'createdAt' | 'usageCount'>) => void;
-  suspendLicense: (id: string) => void;
-  activateLicense: (id: string) => void;
-  renewLicense: (id: string, newExpiryDate: string) => void;
-  deleteLicense: (id: string) => void;
+  generateLicense: (license: Omit<License, 'id' | 'key' | 'createdAt' | 'usageCount'>) => Promise<void>;
+  suspendLicense: (id: string) => Promise<void>;
+  activateLicense: (id: string) => Promise<void>;
+  renewLicense: (id: string, newExpiryDate: string) => Promise<void>;
+  deleteLicense: (id: string) => Promise<void>;
   updateFirebaseConfig: (config: FirebaseConfig) => void;
 }
 
@@ -80,7 +82,7 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
     }));
   },
 
-  generateLicense: (licenseData) => {
+  generateLicense: async (licenseData) => {
     // Generate a random mock license key: LIC-XXXX-XXXX-XXXX-XXXX
     const randomHex = (len: number) => {
       const chars = '0123456789ABCDEF';
@@ -91,13 +93,25 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
       return result;
     };
     const key = `LIC-${randomHex(4)}-${randomHex(4)}-${randomHex(4)}-${randomHex(4)}`;
+    const newLicenseId = `lic-${Date.now()}`;
     const newLicense: License = {
       ...licenseData,
-      id: `lic-${Date.now()}`,
+      id: newLicenseId,
       key,
       createdAt: new Date().toISOString(),
       usageCount: 0,
     };
+
+    const state = get();
+    const { db } = getFirebaseInstance(state.firebaseConfig);
+
+    if (db) {
+      try {
+        await setDoc(doc(db, 'licenses', newLicenseId), newLicense);
+      } catch (error) {
+        console.error('Error saving license to Firestore:', error);
+      }
+    }
 
     set((state) => {
       // Update counts in products
@@ -147,7 +161,18 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
     });
   },
 
-  suspendLicense: (id) => {
+  suspendLicense: async (id) => {
+    const state = get();
+    const { db } = getFirebaseInstance(state.firebaseConfig);
+
+    if (db) {
+      try {
+        await updateDoc(doc(db, 'licenses', id), { status: 'suspended' });
+      } catch (error) {
+        console.error('Error suspending license in Firestore:', error);
+      }
+    }
+
     set((state) => {
       let logEntry: ActivityLog | null = null;
       
@@ -187,7 +212,23 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
     });
   },
 
-  activateLicense: (id) => {
+  activateLicense: async (id) => {
+    const state = get();
+    const { db } = getFirebaseInstance(state.firebaseConfig);
+    const target = state.licenses.find((l) => l.id === id);
+
+    if (db && target) {
+      try {
+        await updateDoc(doc(db, 'licenses', id), {
+          status: 'active',
+          lastActivatedAt: new Date().toISOString(),
+          usageCount: Math.min(target.usageLimit, target.usageCount + 1)
+        });
+      } catch (error) {
+        console.error('Error activating license in Firestore:', error);
+      }
+    }
+
     set((state) => {
       let logEntry: ActivityLog | null = null;
 
@@ -232,7 +273,21 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
     });
   },
 
-  renewLicense: (id, newExpiryDate) => {
+  renewLicense: async (id, newExpiryDate) => {
+    const state = get();
+    const { db } = getFirebaseInstance(state.firebaseConfig);
+
+    if (db) {
+      try {
+        await updateDoc(doc(db, 'licenses', id), {
+          status: 'active',
+          expiresAt: newExpiryDate
+        });
+      } catch (error) {
+        console.error('Error renewing license in Firestore:', error);
+      }
+    }
+
     set((state) => {
       let logEntry: ActivityLog | null = null;
 
@@ -276,7 +331,18 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
     });
   },
 
-  deleteLicense: (id) => {
+  deleteLicense: async (id) => {
+    const state = get();
+    const { db } = getFirebaseInstance(state.firebaseConfig);
+
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'licenses', id));
+      } catch (error) {
+        console.error('Error deleting license from Firestore:', error);
+      }
+    }
+
     set((state) => {
       const targetLicense = state.licenses.find((l) => l.id === id);
       if (!targetLicense) return state;
