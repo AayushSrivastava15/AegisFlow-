@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '../../components/dashboard/Sidebar';
 import Header from '../../components/dashboard/Header';
+import { useLicenseStore } from '../../store/licenseStore';
 
 export default function DashboardLayout({
   children,
@@ -10,6 +11,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { firebaseConfig, subscribeToLicenses } = useLicenseStore();
+
+  useEffect(() => {
+    const unsubscribe = subscribeToLicenses();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [firebaseConfig, subscribeToLicenses]);
 
   return (
     <div className="min-h-screen bg-[#030712] relative overflow-hidden font-sans">

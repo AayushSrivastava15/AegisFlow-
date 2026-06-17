@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Product, Client, License, ActivityLog, FirebaseConfig } from '../types';
 import { initialProducts, initialClients, initialLicenses, initialLogs } from '../data/mockData';
 import { getFirebaseInstance } from '../lib/firebase';
-import { doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
 
 interface LicenseState {
   products: Product[];
@@ -20,6 +20,7 @@ interface LicenseState {
   renewLicense: (id: string, newExpiryDate: string) => Promise<void>;
   deleteLicense: (id: string) => Promise<void>;
   updateFirebaseConfig: (config: FirebaseConfig) => void;
+  subscribeToLicenses: () => (() => void) | undefined;
 }
 
 export const useLicenseStore = create<LicenseState>((set, get) => ({
@@ -397,5 +398,16 @@ export const useLicenseStore = create<LicenseState>((set, get) => ({
 
   updateFirebaseConfig: (config) => {
     set({ firebaseConfig: config });
+  },
+
+  subscribeToLicenses: () => {
+    const state = get();
+    const { db } = getFirebaseInstance(state.firebaseConfig);
+    if (!db) return undefined;
+
+    return onSnapshot(collection(db, 'licenses'), (snapshot) => {
+      const licensesList = snapshot.docs.map((doc) => doc.data() as License);
+      set({ licenses: licensesList });
+    });
   },
 }));
