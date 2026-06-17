@@ -3,21 +3,33 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Mail, Lock, ArrowRight, Info } from 'lucide-react';
+import { ShieldCheck, Mail, Lock, User, Building, ArrowRight, Info } from 'lucide-react';
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
 
+  const [name, setName] = useState('');
+  const [company, setCompany] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      alert('Passwords do not match!');
+      return;
+    }
+    if (!agreeTerms) {
+      alert('You must agree to the Terms of Service.');
+      return;
+    }
+    
     setIsLoading(true);
 
-    // Mock authentication lag
+    // Mock registration delay
     setTimeout(() => {
       setIsLoading(false);
       // Redirect to Dashboard home
@@ -47,8 +59,8 @@ export default function LoginPage() {
             </div>
           </Link>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">Access Licensing Console</h2>
-            <p className="text-xs text-slate-500 mt-1">Sign in with your workspace credentials.</p>
+            <h2 className="text-xl font-bold text-white tracking-tight">Create Workspace Account</h2>
+            <p className="text-xs text-slate-500 mt-1">Deploy your own SaaS licensing node in seconds.</p>
           </div>
         </div>
 
@@ -56,12 +68,45 @@ export default function LoginPage() {
         <div className="mb-6 p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/10 text-indigo-400 text-[11px] flex gap-2">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>
-            <strong>UI Mode Active:</strong> Clicking Sign In or Google Sign In will redirect directly to the console.
+            <strong>UI Mode Active:</strong> Registering will mock save your details in-memory and redirect to the dashboard.
           </span>
         </div>
 
-        {/* Login Form */}
+        {/* Registration Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          
+          {/* Full Name */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Full Name</label>
+            <div className="relative">
+              <User className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                required
+                placeholder="Aayush Sharma"
+                className="w-full glass-input pl-10 text-xs"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* Company Name */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Company Name</label>
+            <div className="relative">
+              <Building className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                required
+                placeholder="AegisFlow Ltd."
+                className="w-full glass-input pl-10 text-xs"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+            </div>
+          </div>
+
           {/* Email */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Email Address</label>
@@ -78,45 +123,54 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Password */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center">
+          {/* Passwords grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
               <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Password</label>
-              <button 
-                type="button" 
-                onClick={() => alert('Forgot Password UI placeholder action.')}
-                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-semibold"
-              >
-                Forgot Password?
-              </button>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className="w-full glass-input pl-10 text-xs"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-              <input
-                type="password"
-                required
-                placeholder="••••••••••••"
-                className="w-full glass-input pl-10 text-xs"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Confirm</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  className="w-full glass-input pl-10 text-xs"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 
-          {/* Remember me */}
+          {/* Terms checkbox */}
           <div className="flex items-center justify-between pt-1">
-            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <label className="flex items-start gap-2 text-xs text-slate-400 cursor-pointer select-none">
               <input
                 type="checkbox"
-                className="w-3.5 h-3.5 accent-indigo-500 rounded border-white/10 bg-[#090d16] focus:ring-indigo-500"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
+                required
+                className="w-3.5 h-3.5 accent-indigo-500 rounded border-white/10 bg-[#090d16] focus:ring-indigo-500 mt-0.5"
+                checked={agreeTerms}
+                onChange={(e) => setAgreeTerms(e.target.checked)}
               />
-              <span>Remember this device</span>
+              <span>I agree to the Terms of Service & Privacy Policy</span>
             </label>
           </div>
 
-          {/* Login Action Button */}
+          {/* Sign Up Action Button */}
           <button
             type="submit"
             disabled={isLoading}
@@ -126,7 +180,7 @@ export default function LoginPage() {
               <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                Sign In to Console <ArrowRight className="w-4 h-4" />
+                Create Free Account <ArrowRight className="w-4 h-4" />
               </>
             )}
           </button>
@@ -137,11 +191,11 @@ export default function LoginPage() {
             <div className="w-full border-t border-white/5" />
           </div>
           <span className="relative bg-[#090d16] px-3 text-[10px] uppercase font-mono text-slate-500 tracking-wider">
-            OR CONTINUE WITH
+            OR REGISTER WITH
           </span>
         </div>
 
-        {/* Google Mock login */}
+        {/* Google Mock sign-up */}
         <button
           type="button"
           onClick={() => {
@@ -156,16 +210,16 @@ export default function LoginPage() {
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114-3.51 0-6.355-2.846-6.355-6.356s2.846-6.356 6.355-6.356c1.613 0 3.084.6 4.223 1.579l3.057-3.057C19.347 2.683 15.937 1.5 12.24 1.5 6.015 1.5 1 6.515 1 12.74s5.015 11.24 11.24 11.24c6.29 0 10.748-4.42 10.748-10.91 0-.723-.077-1.414-.213-2.07H12.24z" />
           </svg>
-          <span>Authenticate with Google</span>
+          <span>Sign up with Google</span>
         </button>
 
-        {/* Register link */}
+        {/* Login Link */}
         <div className="text-center pt-5">
           <p className="text-[11px] text-slate-500">
-            Don't have an account?{' '}
-            <Link href="/register">
+            Already have an account?{' '}
+            <Link href="/login">
               <span className="text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer">
-                Create one now
+                Sign In instead
               </span>
             </Link>
           </p>
@@ -184,4 +238,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
