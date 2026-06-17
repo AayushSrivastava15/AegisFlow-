@@ -133,10 +133,15 @@ export default function LandingPage() {
             AegisFlow
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <Link href="/login">
             <span className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer">
               Login
+            </span>
+          </Link>
+          <Link href="/register">
+            <span className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer">
+              Register
             </span>
           </Link>
           <Link href="/dashboard">
@@ -165,14 +170,19 @@ export default function LandingPage() {
             Provision license keys, track developer seats, monitor telemetry connections, and automate client renewals with our premium SaaS dashboard.
           </p>
           
-          <div className="flex justify-center items-center gap-4 pt-4">
+          <div className="flex flex-wrap justify-center items-center gap-4 pt-4">
             <Link href="/dashboard">
               <span className="glass-button-primary px-6 py-3 text-sm font-semibold flex items-center gap-2 cursor-pointer group">
                 Enter Console <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
               </span>
             </Link>
-            <Link href="/login">
+            <Link href="/register">
               <span className="glass-button px-6 py-3 text-sm font-semibold cursor-pointer">
+                Create Account
+              </span>
+            </Link>
+            <Link href="/login">
+              <span className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer px-2 py-1">
                 Sign In
               </span>
             </Link>
