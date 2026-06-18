@@ -11,7 +11,9 @@ import {
   Settings, 
   LogOut,
   ChevronDown,
-  Info
+  Info,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useLicenseStore } from '../../store/licenseStore';
 
@@ -21,14 +23,35 @@ interface HeaderProps {
 
 export default function Header({ onMenuToggle }: HeaderProps) {
   const pathname = usePathname();
-  const logs = useLicenseStore((state) => state.logs);
+  const { logs, user, signOutUser } = useLicenseStore();
   
   const [searchFocused, setSearchFocused] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
+
+  // Initialize theme state from DOM class on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isLight = document.documentElement.classList.contains('light');
+      setTheme(isLight ? 'light' : 'dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(nextTheme);
+    if (nextTheme === 'light') {
+      document.documentElement.classList.add('light');
+      localStorage.setItem('aegisflow_theme', 'light');
+    } else {
+      document.documentElement.classList.remove('light');
+      localStorage.setItem('aegisflow_theme', 'dark');
+    }
+  };
 
   // Close menus when clicking outside
   useEffect(() => {
@@ -86,8 +109,8 @@ export default function Header({ onMenuToggle }: HeaderProps) {
           </div>
           <input
             type="text"
-            placeholder="Search licenses, clients, keys... (⌘K)"
-            className={`w-64 px-9 py-1.5 text-xs rounded-lg bg-white/[0.02] border transition-all placeholder-slate-500 ${
+            placeholder="Search licenses, clients, keys..."
+            className={`w-64 px-9 py-1.5 text-xs rounded-lg bg-[#030712] border transition-all placeholder-slate-500 ${
               searchFocused 
                 ? 'border-indigo-500 w-80 shadow-md shadow-indigo-500/10' 
                 : 'border-white/5 hover:border-white/10'
@@ -101,6 +124,23 @@ export default function Header({ onMenuToggle }: HeaderProps) {
             </span>
           </div>
         </div>
+
+        {/* Docs Link */}
+        <Link
+          href="/dashboard/docs"
+          className="text-xs font-semibold text-slate-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg border border-white/5 bg-white/[0.01] hover:bg-white/5"
+        >
+          Docs
+        </Link>
+
+        {/* Theme Toggle */}
+        <button
+          onClick={toggleTheme}
+          className="p-2 text-slate-400 hover:text-white rounded-lg border border-white/5 bg-white/[0.01] hover:bg-white/5 transition-all"
+          title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+        >
+          {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+        </button>
 
         {/* Notification Center */}
         <div className="relative" ref={notificationRef}>
@@ -126,7 +166,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                 ) : (
                   notificationsList.map((notif) => (
                     <div 
-                      key={notif.id} 
+                      key={notif.logId} 
                       className="px-4 py-2.5 hover:bg-white/5 rounded-lg transition-colors flex items-start gap-2.5 cursor-pointer"
                     >
                       <div className="p-1 rounded bg-indigo-500/10 mt-0.5">
@@ -134,7 +174,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-slate-300 font-medium leading-normal line-clamp-2">
-                          {notif.description}
+                          {notif.action}
                         </p>
                         <span className="text-[9px] text-slate-500 block mt-1 font-mono">
                           {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -162,11 +202,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
             className="flex items-center gap-2 p-1 pl-2.5 rounded-lg border border-white/5 bg-white/[0.01] hover:bg-white/5 transition-all text-left"
           >
             <div className="flex flex-col text-right">
-              <span className="text-xs font-medium text-slate-200">Aayush Sharma</span>
-              <span className="text-[9px] text-slate-500 font-mono">Administrator</span>
+              <span className="text-xs font-medium text-slate-200">{user?.displayName || 'Administrator'}</span>
+              <span className="text-[9px] text-slate-500 font-mono">{user?.company || 'Workspace'}</span>
             </div>
             <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gradient-to-tr from-purple-500 to-indigo-500 text-white text-xs font-bold font-mono">
-              AS
+              {user?.displayName ? user.displayName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'A'}
             </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
@@ -189,12 +229,16 @@ export default function Header({ onMenuToggle }: HeaderProps) {
                 </div>
               </Link>
               <div className="border-t border-white/5 my-1" />
-              <Link href="/" onClick={() => setShowProfileMenu(false)}>
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/5 rounded-lg transition-colors cursor-pointer">
-                  <LogOut className="w-4 h-4" />
-                  <span>Sign Out</span>
-                </div>
-              </Link>
+              <button 
+                onClick={async () => {
+                  setShowProfileMenu(false);
+                  await signOutUser();
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-red-500/5 rounded-lg transition-colors cursor-pointer text-left"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
+              </button>
             </div>
           )}
         </div>

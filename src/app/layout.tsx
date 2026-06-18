@@ -26,8 +26,27 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('aegisflow_theme');
+                  if (saved === 'light') {
+                    document.documentElement.classList.add('light');
+                  } else {
+                    document.documentElement.classList.remove('light');
+                  }
+                } catch (e) {}
+              })();
+            `
+          }}
+        />
+      </head>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>{children}</body>
     </html>
   );
 }

@@ -18,7 +18,8 @@ import {
   Filter,
   User,
   Package,
-  Layers
+  Layers,
+  Lock
 } from 'lucide-react';
 import { useLicenseStore } from '../../../store/licenseStore';
 
@@ -26,30 +27,34 @@ export default function LicensesPage() {
   const { 
     licenses, 
     products, 
-    clients, 
+    customers, 
     generateLicense, 
     suspendLicense, 
     activateLicense, 
     renewLicense, 
-    deleteLicense 
+    deleteLicense,
+    user
   } = useLicenseStore();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [productFilter, setProductFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [productFilter, setProductFilter] = useState('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
   // Form states for license generation
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
-  const [usageLimit, setUsageLimit] = useState(100);
+  const [usageLimit, setUsageLimit] = useState<number | ''>(100);
   const [expiryPreset, setExpiryPreset] = useState<'month' | 'year' | 'custom'>('year');
   const [expiryDate, setExpiryDate] = useState(() => {
     const oneYearLater = new Date();
     oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
     return oneYearLater.toISOString().split('T')[0];
   });
+
+  // Role authorization
+  const isReadOnly = user?.role === 'viewer';
 
   const setPresetDate = (preset: 'month' | 'year' | 'custom') => {
     setExpiryPreset(preset);
@@ -64,15 +69,15 @@ export default function LicensesPage() {
   };
 
   // Unique lists for filtering
-  const productOptions = ['All', ...new Set(licenses.map((l) => l.productName))];
+  const productOptions = ['ALL', ...new Set(licenses.map((l) => l.productName))];
 
   // Filtering logic
   const filteredLicenses = licenses.filter((l) => {
     const matchesSearch = l.key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          l.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          l.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           l.productName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || l.status === statusFilter.toLowerCase();
-    const matchesProduct = productFilter === 'All' || l.productName === productFilter;
+    const matchesStatus = statusFilter === 'ALL' || l.status === statusFilter;
+    const matchesProduct = productFilter === 'ALL' || l.productName === productFilter;
     return matchesSearch && matchesStatus && matchesProduct;
   });
 
@@ -82,37 +87,47 @@ export default function LicensesPage() {
     setTimeout(() => setCopiedKeyId(null), 2000);
   };
 
-  const handleGenerateLicense = (e: React.FormEvent) => {
+  const handleGenerateLicense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClientId || !selectedProductId) return;
+    if (isReadOnly) return;
+    if (!selectedCustomerId || !selectedProductId) return;
 
-    const client = clients.find(c => c.id === selectedClientId);
-    const product = products.find(p => p.id === selectedProductId);
+    const cust = customers.find(c => c.customerId === selectedCustomerId);
+    const prod = products.find(p => p.productId === selectedProductId);
 
-    if (!client || !product) return;
+    if (!cust || !prod) return;
 
-    generateLicense({
-      clientId: client.id,
-      clientName: client.name,
-      productId: product.id,
-      productName: product.name,
-      status: 'active',
-      expiresAt: new Date(expiryDate).toISOString(),
-      usageLimit: Number(usageLimit),
-    });
+    try {
+      await generateLicense({
+        customerId: cust.customerId,
+        customerName: cust.name,
+        productId: prod.productId,
+        productName: prod.name,
+        status: 'ACTIVE',
+        expiryDate: new Date(expiryDate).toISOString(),
+        usageLimit: usageLimit === '' ? 1 : Number(usageLimit),
+      });
 
-    // Reset form
-    setSelectedClientId('');
-    setSelectedProductId('');
-    setUsageLimit(100);
-    setIsModalOpen(false);
+      // Reset form
+      setSelectedCustomerId('');
+      setSelectedProductId('');
+      setUsageLimit(100);
+      setIsModalOpen(false);
+    } catch (err) {
+      alert('Failed to generate license.');
+    }
   };
 
-  const handleRenew = (id: string) => {
+  const handleRenew = async (id: string) => {
+    if (isReadOnly) return;
     // Renew extends expiration by 1 year from today
     const newExpiry = new Date();
     newExpiry.setFullYear(newExpiry.getFullYear() + 1);
-    renewLicense(id, newExpiry.toISOString());
+    try {
+      await renewLicense(id, newExpiry.toISOString());
+    } catch (err) {
+      alert('Failed to renew license.');
+    }
   };
 
   return (
@@ -127,17 +142,25 @@ export default function LicensesPage() {
           </p>
         </div>
         
-        <button
-          onClick={() => {
-            // Set defaults if lists are populated
-            if (clients.length > 0) setSelectedClientId(clients[0].id);
-            if (products.length > 0) setSelectedProductId(products[0].id);
-            setIsModalOpen(true);
-          }}
-          className="glass-button-primary flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> Generate License
-        </button>
+        {!isReadOnly ? (
+          <button
+            onClick={() => {
+              if (customers.length > 0) setSelectedCustomerId(customers[0].customerId);
+              if (products.length > 0) setSelectedProductId(products[0].productId);
+              setIsModalOpen(true);
+            }}
+            className="glass-button-primary flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Generate License
+          </button>
+        ) : (
+          <button
+            disabled
+            className="glass-button flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold self-start sm:self-auto cursor-not-allowed opacity-50 select-none"
+          >
+            <Lock className="w-3.5 h-3.5" /> Generate License
+          </button>
+        )}
       </div>
 
       {/* Filters and Search toolbar */}
@@ -147,7 +170,7 @@ export default function LicensesPage() {
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="Search by key, client name, or product..."
+            placeholder="Search by key, customer name, or product..."
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-white/[0.02] border border-white/5 focus:border-indigo-500 focus:outline-none placeholder-slate-500 text-white"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -162,10 +185,11 @@ export default function LicensesPage() {
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
-            <option value="All">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="Suspended">Suspended</option>
-            <option value="Expiring">Expiring Soon</option>
+            <option value="ALL">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="EXPIRED">Expired</option>
+            <option value="REVOKED">Revoked</option>
           </select>
         </div>
 
@@ -178,7 +202,7 @@ export default function LicensesPage() {
             onChange={(e) => setProductFilter(e.target.value)}
           >
             {productOptions.map((prod) => (
-              <option key={prod} value={prod}>{prod === 'All' ? 'All Products' : prod}</option>
+              <option key={prod} value={prod}>{prod === 'ALL' ? 'All Products' : prod}</option>
             ))}
           </select>
         </div>
@@ -197,30 +221,32 @@ export default function LicensesPage() {
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.01] text-slate-400 font-medium select-none">
                 <th className="p-4">License Key</th>
-                <th className="p-4">Client</th>
+                <th className="p-4">Customer</th>
                 <th className="p-4">Product</th>
                 <th className="p-4">Status</th>
                 <th className="p-4">Usage Limit</th>
                 <th className="p-4">Expires On</th>
-                <th className="p-4 text-right">Actions</th>
+                {!isReadOnly && <th className="p-4 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-slate-300">
               {filteredLicenses.map((lic) => {
-                const isCopied = copiedKeyId === lic.id;
+                const isCopied = copiedKeyId === lic.licenseId;
                 
                 // Status color rendering
                 let statusBadge = '';
-                if (lic.status === 'active') {
+                if (lic.status === 'ACTIVE') {
                   statusBadge = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/10';
-                } else if (lic.status === 'suspended') {
-                  statusBadge = 'bg-rose-500/10 text-rose-400 border-rose-500/10';
-                } else {
+                } else if (lic.status === 'SUSPENDED') {
+                  statusBadge = 'bg-pink-500/10 text-pink-400 border-pink-500/10';
+                } else if (lic.status === 'EXPIRED') {
                   statusBadge = 'bg-amber-500/10 text-amber-400 border-amber-500/10';
+                } else {
+                  statusBadge = 'bg-red-500/10 text-red-500 border-red-500/10';
                 }
 
                 return (
-                  <tr key={lic.id} className="hover:bg-white/[0.01] transition-colors">
+                  <tr key={lic.licenseId} className="hover:bg-white/[0.01] transition-colors">
                     
                     {/* License key with copy CTA */}
                     <td className="p-4">
@@ -229,7 +255,7 @@ export default function LicensesPage() {
                           {lic.key}
                         </span>
                         <button
-                          onClick={() => handleCopyKey(lic.id, lic.key)}
+                          onClick={() => handleCopyKey(lic.licenseId, lic.key)}
                           className="p-1.5 rounded-lg border border-white/5 hover:bg-white/5 text-slate-500 hover:text-white transition-all cursor-pointer"
                           title="Copy license key"
                         >
@@ -238,12 +264,12 @@ export default function LicensesPage() {
                       </div>
                     </td>
 
-                    {/* Client company */}
+                    {/* Customer */}
                     <td className="p-4">
                       <div className="flex items-center gap-2">
                         <User className="w-3.5 h-3.5 text-slate-500" />
                         <div>
-                          <span className="font-semibold text-slate-200 block">{lic.clientName}</span>
+                          <span className="font-semibold text-slate-200 block">{lic.customerName}</span>
                         </div>
                       </div>
                     </td>
@@ -259,7 +285,7 @@ export default function LicensesPage() {
                     {/* Status Badge */}
                     <td className="p-4">
                       <span className={`text-[10px] font-semibold border px-2.5 py-0.5 rounded-full capitalize ${statusBadge}`}>
-                        {lic.status === 'expiring' ? 'expiring soon' : lic.status}
+                        {lic.status}
                       </span>
                     </td>
 
@@ -272,55 +298,57 @@ export default function LicensesPage() {
                     <td className="p-4 text-slate-400 font-mono">
                       <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{new Date(lic.expiresAt).toLocaleDateString()}</span>
+                        <span>{new Date(lic.expiryDate).toLocaleDateString()}</span>
                       </div>
                     </td>
 
                     {/* Operational Action items */}
-                    <td className="p-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {/* Toggle Suspend/Activate */}
-                        {lic.status === 'suspended' ? (
-                          <button
-                            onClick={() => activateLicense(lic.id)}
-                            className="p-1.5 rounded-lg border border-white/5 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 transition-all cursor-pointer"
-                            title="Activate license"
-                          >
-                            <Play className="w-3.5 h-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => suspendLicense(lic.id)}
-                            className="p-1.5 rounded-lg border border-white/5 bg-rose-500/5 hover:bg-rose-500/10 text-rose-400 transition-all cursor-pointer"
-                            title="Suspend license"
-                          >
-                            <Pause className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                    {!isReadOnly && (
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* Toggle Suspend/Activate */}
+                          {lic.status === 'SUSPENDED' ? (
+                            <button
+                              onClick={() => activateLicense(lic.licenseId)}
+                              className="p-1.5 rounded-lg border border-white/5 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-400 transition-all cursor-pointer"
+                              title="Activate license"
+                            >
+                              <Play className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => suspendLicense(lic.licenseId)}
+                              className="p-1.5 rounded-lg border border-white/5 bg-rose-500/5 hover:bg-rose-500/10 text-rose-400 transition-all cursor-pointer"
+                              title="Suspend license"
+                            >
+                              <Pause className="w-3.5 h-3.5" />
+                            </button>
+                          )}
 
-                        {/* Renew */}
-                        <button
-                          onClick={() => handleRenew(lic.id)}
-                          className="p-1.5 rounded-lg border border-white/5 bg-amber-500/5 hover:bg-amber-500/10 text-amber-400 transition-all cursor-pointer"
-                          title="Renew license for 1 year"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" />
-                        </button>
+                          {/* Renew */}
+                          <button
+                            onClick={() => handleRenew(lic.licenseId)}
+                            className="p-1.5 rounded-lg border border-white/5 bg-amber-500/5 hover:bg-amber-500/10 text-amber-400 transition-all cursor-pointer"
+                            title="Renew license for 1 year"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          </button>
 
-                        {/* Delete */}
-                        <button
-                          onClick={() => {
-                            if (confirm('Are you sure you want to permanently delete this license key?')) {
-                              deleteLicense(lic.id);
-                            }
-                          }}
-                          className="p-1.5 rounded-lg border border-white/5 bg-white/[0.01] hover:bg-rose-500/10 hover:text-rose-400 text-slate-500 transition-all cursor-pointer"
-                          title="Delete license key"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
+                          {/* Delete */}
+                          <button
+                            onClick={() => {
+                              if (confirm('Are you sure you want to permanently delete this license key?')) {
+                                deleteLicense(lic.licenseId);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg border border-white/5 bg-white/[0.01] hover:bg-rose-500/10 hover:text-rose-400 text-slate-500 transition-all cursor-pointer"
+                            title="Delete license key"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    )}
 
                   </tr>
                 );
@@ -360,25 +388,25 @@ export default function LicensesPage() {
                 </button>
               </div>
 
-              {clients.length === 0 || products.length === 0 ? (
+              {customers.length === 0 || products.length === 0 ? (
                 <div className="py-6 text-center text-xs text-slate-500 space-y-2">
                   <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto" />
-                  <p>You must have at least one product and one client registered to generate a license.</p>
+                  <p>You must have at least one product and one customer registered to generate a license.</p>
                 </div>
               ) : (
                 <form onSubmit={handleGenerateLicense} className="mt-4 space-y-4">
                   
-                  {/* Select Client */}
+                  {/* Select Customer */}
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Assign to Client</label>
+                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Assign to Customer</label>
                     <select
                       required
                       className="w-full bg-[#030712] border border-white/8 rounded-xl p-2.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                      value={selectedClientId}
-                      onChange={(e) => setSelectedClientId(e.target.value)}
+                      value={selectedCustomerId}
+                      onChange={(e) => setSelectedCustomerId(e.target.value)}
                     >
-                      {clients.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.company})</option>
+                      {customers.map((c) => (
+                        <option key={c.customerId} value={c.customerId}>{c.name} ({c.company})</option>
                       ))}
                     </select>
                   </div>
@@ -393,7 +421,7 @@ export default function LicensesPage() {
                       onChange={(e) => setSelectedProductId(e.target.value)}
                     >
                       {products.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
+                        <option key={p.productId} value={p.productId}>{p.name}</option>
                       ))}
                     </select>
                   </div>
@@ -409,7 +437,10 @@ export default function LicensesPage() {
                         max={10000}
                         className="w-full glass-input text-xs"
                         value={usageLimit}
-                        onChange={(e) => setUsageLimit(Number(e.target.value))}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setUsageLimit(val === '' ? '' : Number(val));
+                        }}
                       />
                     </div>
 
@@ -472,3 +503,4 @@ export default function LicensesPage() {
     </div>
   );
 }
+

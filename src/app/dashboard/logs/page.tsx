@@ -17,11 +17,33 @@ import { useLicenseStore } from '../../../store/licenseStore';
 
 export default function ActivityLogsPage() {
   const logs = useLicenseStore((state) => state.logs);
-  const [selectedType, setSelectedType] = useState<'all' | 'created' | 'activated' | 'suspended' | 'renewed' | 'deleted'>('all');
+  const [selectedType, setSelectedType] = useState<'all' | 'created' | 'activated' | 'suspended' | 'renewed' | 'deleted' | 'other'>('all');
+
+  // Dynamic helper to extract category type from action text
+  const getLogType = (actionText: string): 'created' | 'activated' | 'suspended' | 'renewed' | 'deleted' | 'other' => {
+    const act = actionText.toLowerCase();
+    if (act.includes('created') || act.includes('provisioned') || act.includes('added') || act.includes('issued') || act.includes('invited')) {
+      return 'created';
+    }
+    if (act.includes('activated') || act.includes('validated')) {
+      return 'activated';
+    }
+    if (act.includes('suspended')) {
+      return 'suspended';
+    }
+    if (act.includes('renewed')) {
+      return 'renewed';
+    }
+    if (act.includes('deleted') || act.includes('removed')) {
+      return 'deleted';
+    }
+    return 'other';
+  };
 
   // Filter logs by type
   const filteredLogs = logs.filter((log) => {
-    return selectedType === 'all' || log.type === selectedType;
+    const inferredType = getLogType(log.action);
+    return selectedType === 'all' || inferredType === selectedType;
   });
 
   const getLogIcon = (type: string) => {
@@ -79,11 +101,12 @@ export default function ActivityLogsPage() {
             onChange={(e) => setSelectedType(e.target.value as any)}
           >
             <option value="all">All Activities</option>
-            <option value="created">Created</option>
-            <option value="activated">Activated</option>
+            <option value="created">Created & Issued</option>
+            <option value="activated">Activated & Validated</option>
             <option value="suspended">Suspended</option>
             <option value="renewed">Renewed</option>
             <option value="deleted">Deleted</option>
+            <option value="other">Other Operations</option>
           </select>
         </div>
       </div>
@@ -99,34 +122,35 @@ export default function ActivityLogsPage() {
             
             {filteredLogs.map((log, idx) => {
               const logDate = new Date(log.timestamp);
+              const inferredType = getLogType(log.action);
               
               return (
                 <motion.div 
-                  key={log.id} 
+                  key={log.logId} 
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: Math.min(idx * 0.04, 0.4) }}
                   className="relative group"
                 >
                   {/* Bullet point icon */}
-                  <span className={`absolute top-0.5 -left-[35px] w-7 h-7 rounded-lg border flex items-center justify-center ${getIconBg(log.type)} bg-[#030712] z-10 transition-transform duration-200 group-hover:scale-110 shadow-lg`}>
-                    {getLogIcon(log.type)}
+                  <span className={`absolute top-0.5 -left-[35px] w-7 h-7 rounded-lg border flex items-center justify-center ${getIconBg(inferredType)} bg-[#030712] z-10 transition-transform duration-200 group-hover:scale-110 shadow-lg`}>
+                    {getLogIcon(inferredType)}
                   </span>
 
                   {/* Log Card Box */}
                   <div className="p-4 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] hover:border-white/10 transition-all space-y-2.5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-white">
-                        {log.description}
+                      <span className="text-xs font-semibold text-slate-200">
+                        {log.action}
                       </span>
                       
                       <div className="flex items-center gap-3 text-[10px] text-slate-500 font-mono">
                         <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
+                          <Calendar className="w-3.5 h-3.5" />
                           {logDate.toLocaleDateString()}
                         </span>
                         <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
+                          <Clock className="w-3.5 h-3.5" />
                           {logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
@@ -135,18 +159,12 @@ export default function ActivityLogsPage() {
                     {/* Metadata tags */}
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-[9px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded border border-white/5 bg-white/[0.02] text-slate-400">
-                        {log.type}
+                        {inferredType}
                       </span>
                       
-                      {log.productName && (
+                      {log.employeeEmail && (
                         <span className="text-[9px] font-mono px-2 py-0.5 rounded border border-indigo-500/5 bg-indigo-500/5 text-indigo-400">
-                          Product: {log.productName}
-                        </span>
-                      )}
-
-                      {log.clientName && (
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded border border-purple-500/5 bg-purple-500/5 text-purple-400">
-                          Client: {log.clientName}
+                          Executor: {log.employeeEmail}
                         </span>
                       )}
                     </div>

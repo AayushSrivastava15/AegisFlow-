@@ -13,8 +13,10 @@ import {
   Settings, 
   LogOut, 
   ShieldCheck,
-  X
+  X,
+  BookOpen
 } from 'lucide-react';
+import { useLicenseStore } from '../../store/licenseStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -23,13 +25,15 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const signOutUser = useLicenseStore((state) => state.signOutUser);
 
   const menuItems = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Products', href: '/dashboard/products', icon: Package },
-    { name: 'Clients', href: '/dashboard/clients', icon: Users },
+    { name: 'Customers', href: '/dashboard/clients', icon: Users },
     { name: 'Licenses', href: '/dashboard/licenses', icon: Key },
     { name: 'Activity Logs', href: '/dashboard/logs', icon: ClipboardList },
+    { name: 'Docs', href: '/dashboard/docs', icon: BookOpen },
     { name: 'Settings', href: '/dashboard/settings', icon: Settings },
   ];
 
@@ -86,12 +90,15 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Footer / User Profile shortcut */}
       <div className="p-4 border-t border-white/5 bg-white/[0.01]">
-        <Link href="/">
-          <div className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 rounded-xl transition-colors hover:bg-red-500/5 cursor-pointer">
-            <LogOut className="w-5 h-5" />
-            <span className="font-medium text-sm">Sign Out</span>
-          </div>
-        </Link>
+        <button
+          onClick={async () => {
+            await signOutUser();
+          }}
+          className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-red-400 rounded-xl transition-colors hover:bg-red-500/5 cursor-pointer text-left"
+        >
+          <LogOut className="w-5 h-5" />
+          <span className="font-medium text-sm">Sign Out</span>
+        </button>
       </div>
     </div>
   );

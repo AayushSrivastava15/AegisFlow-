@@ -1,92 +1,184 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Package, 
   Search, 
-  Filter, 
   Plus, 
   ChevronRight, 
   X,
-  CreditCard,
   Layers,
   Activity,
-  ShieldAlert,
+  CheckCircle,
+  AlertTriangle,
+  Lock,
+  Copy,
+  Check,
+  TrendingUp,
+  Cpu,
   RefreshCw,
+  Clock,
+  Sparkles,
+  ShieldCheck,
   LayoutGrid,
   List
 } from 'lucide-react';
 import { useLicenseStore } from '../../../store/licenseStore';
-
-const iconMap: { [key: string]: React.ComponentType<any> } = {
-  ShieldAlert,
-  Activity,
-  RefreshCw,
-  CreditCard,
-  Package
-};
+import { Product } from '../../../types';
 
 export default function ProductsPage() {
-  const { products, addProduct } = useLicenseStore();
+  const { products, addProduct, licenses } = useLicenseStore();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedType, setSelectedType] = useState('All');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  
+  // Registration Wizard Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // Form states
   const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('Security');
-  const [priceAmount, setPriceAmount] = useState('99');
-  const [priceInterval, setPriceInterval] = useState<'mo' | 'yr'>('mo');
-  const [icon, setIcon] = useState('Package');
+  const [type, setType] = useState<Product['type']>('SaaS Application');
+  const [step, setStep] = useState<'input' | 'credentials'>('input');
+  
+  // Credentials reference for copying in step 2
+  const [createdKeys, setCreatedKeys] = useState<{ id: string; apiKey: string; secret: string } | null>(null);
+  const [copiedKey, setCopiedKey] = useState<'api' | 'secret' | null>(null);
 
-  // Categories extraction
-  const categories = ['All', ...new Set(products.map((p) => p.category))];
+  // Filter types
+  const productTypes = ['All', 'SaaS Application', 'REST API', 'Internal Platform', 'Enterprise Software', 'Cloud Service'];
 
-  // Filtering
+  // Scoped Filtering
   const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = selectedType === 'All' || p.type === selectedType;
+    return matchesSearch && matchesType;
   });
 
-  const handleAddProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
-    const formattedPrice = `$${priceAmount || '0'}/${priceInterval}`;
+    try {
+      await addProduct({
+        name,
+        type
+      });
 
-    addProduct({
-      name,
-      description,
-      category,
-      price: formattedPrice,
-      icon
-    });
+      // Retrieve the newly created product to show its keys
+      const allProducts = useLicenseStore.getState().products;
+      const newProd = allProducts[0]; // Sorted by createdAt desc, so it is index 0
+      
+      if (newProd) {
+        setCreatedKeys({
+          id: newProd.productId,
+          apiKey: newProd.apiKey,
+          secret: newProd.sdkSecret
+        });
+        setStep('credentials');
+      } else {
+        setIsModalOpen(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Failed to register product.');
+    }
+  };
 
-    // Reset
+  const handleCopyText = (text: string, field: 'api' | 'secret') => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(field);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
+
+  const handleCloseModal = () => {
     setName('');
-    setDescription('');
-    setCategory('Security');
-    setPriceAmount('99');
-    setPriceInterval('mo');
-    setIcon('Package');
+    setType('SaaS Application');
+    setStep('input');
+    setCreatedKeys(null);
     setIsModalOpen(false);
+  };
+
+  // Helper for Status indicator tags
+  const getStatusBadge = (status: Product['status']) => {
+    switch (status) {
+      case 'LIVE':
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            LIVE
+          </span>
+        );
+      case 'WARNING':
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+            WARNING
+          </span>
+        );
+      case 'OFFLINE':
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+            OFFLINE
+          </span>
+        );
+      case 'RENEWAL_NEEDED':
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-orange-500/10 text-orange-400 border border-orange-500/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
+            RENEWAL
+          </span>
+        );
+      case 'SUSPENDED':
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-500/10 text-pink-400 border border-pink-500/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-pink-500" />
+            SUSPENDED
+          </span>
+        );
+      case 'REVOKED':
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-950/20 text-red-700 border border-red-900/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-700" />
+            REVOKED
+          </span>
+        );
+      default:
+        return (
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/10">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+            PENDING
+          </span>
+        );
+    }
+  };
+
+  // Helper to format last heartbeat
+  const formatHeartbeatTime = (isoString: string) => {
+    if (!isoString || isoString === 'Never') return 'Never';
+    try {
+      const diffMs = new Date().getTime() - new Date(isoString).getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHours < 1) {
+        const mins = Math.floor(diffMs / (1000 * 60));
+        return mins <= 1 ? 'Just now' : `${mins} mins ago`;
+      }
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    } catch (e) {
+      return 'Never';
+    }
   };
 
   return (
     <div className="space-y-6">
       
-      {/* Header section */}
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Products Catalog</h2>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white font-sans">Products Catalog</h2>
           <p className="text-xs sm:text-sm text-slate-400">
-            Define, price, and track licensing stats for your application endpoints.
+            Provision connected applications, generate SDK credentials, and monitor server heartbeat metrics.
           </p>
         </div>
         
@@ -94,17 +186,17 @@ export default function ProductsPage() {
           onClick={() => setIsModalOpen(true)}
           className="glass-button-primary flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold self-start sm:self-auto cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Add Product
+          <Plus className="w-4 h-4" /> Provision Product
         </button>
       </div>
 
-      {/* Search & Filter bar */}
+      {/* Filters & Searches */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between p-4 bg-white/[0.01] border border-white/5 rounded-2xl">
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder="Search catalog by name..."
             className="w-full pl-9 pr-4 py-1.5 text-xs rounded-xl bg-white/[0.02] border border-white/5 focus:border-indigo-500 focus:outline-none placeholder-slate-500 text-white"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -112,21 +204,19 @@ export default function ProductsPage() {
         </div>
 
         <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          {/* Categories select list */}
           <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
+            <Layers className="w-3.5 h-3.5 text-slate-400" />
             <select
               className="text-xs bg-[#090d16] border border-white/5 rounded-xl px-2.5 py-1.5 focus:outline-none text-slate-300 focus:border-indigo-500"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
+              value={selectedType}
+              onChange={(e) => setSelectedType(e.target.value)}
             >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+              {productTypes.map((t) => (
+                <option key={t} value={t}>{t}</option>
               ))}
             </select>
           </div>
 
-          {/* Grid/List toggles */}
           <div className="flex items-center border border-white/5 bg-white/[0.02] rounded-xl p-0.5">
             <button
               onClick={() => setViewMode('grid')}
@@ -144,102 +234,130 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      {/* Grid or List View rendering */}
+      {/* Catalog Render */}
       {filteredProducts.length === 0 ? (
         <div className="glass-card-no-hover p-12 text-center rounded-2xl">
           <Package className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <h3 className="text-sm font-semibold text-slate-300">No products found</h3>
-          <p className="text-xs text-slate-500 mt-1">Try adjusting your filters or search terms.</p>
+          <h3 className="text-sm font-semibold text-slate-300">No applications registered</h3>
+          <p className="text-xs text-slate-500 mt-1">Register a product asset and connect it via the SDK to start monitoring.</p>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {filteredProducts.map((p) => {
-            const IconComponent = iconMap[p.icon] || Package;
+            const productLicenses = licenses.filter((l) => l.productId === p.productId);
+            const activeLicCount = productLicenses.filter((l) => l.status === 'ACTIVE').length;
+            
             return (
-              <motion.div
-                key={p.id}
-                layout
-                className="glass-card p-5 rounded-2xl flex flex-col justify-between"
-              >
-                <div className="space-y-4">
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400">
-                        <IconComponent className="w-5 h-5" />
+              <Link key={p.productId} href={`/dashboard/products/${p.productId}`} className="block">
+                <motion.div
+                  layout
+                  className="glass-card p-5 rounded-2xl flex flex-col justify-between h-full cursor-pointer border border-white/5 hover:border-indigo-500/20 transition-all duration-300"
+                >
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500/10 to-purple-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400">
+                          <Package className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">{p.name}</h4>
+                          <span className="text-[9px] text-slate-500 font-mono tracking-wider block mt-0.5">ID: {p.productId}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5">
+                        {getStatusBadge(p.status)}
+                        <span className="text-[9px] text-slate-500 font-mono">v{p.version}</span>
+                      </div>
+                    </div>
+
+                    {/* Middle: Diagnostic Grid */}
+                    <div className="grid grid-cols-3 gap-3 p-3 bg-white/[0.01] border border-white/5 rounded-xl text-center select-none">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Users</span>
+                        <span className="text-xs font-bold text-slate-300 mt-1 block font-mono">{p.activeUsers}</span>
                       </div>
                       <div>
-                        <h4 className="text-sm font-semibold text-white">{p.name}</h4>
-                        <span className="text-[10px] text-indigo-400/80 font-mono bg-indigo-500/5 px-2 py-0.5 rounded border border-indigo-500/5">
-                          {p.category}
-                        </span>
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Licenses</span>
+                        <span className="text-xs font-bold text-slate-300 mt-1 block font-mono">{productLicenses.length}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block uppercase font-mono">Health</span>
+                        <span className={`text-xs font-bold mt-1 block font-mono ${
+                          p.healthScore >= 90 ? 'text-emerald-400' : (p.healthScore >= 70 ? 'text-amber-400' : 'text-rose-500')
+                        }`}>{p.healthScore}%</span>
                       </div>
                     </div>
-                    <span className="text-xs font-mono font-bold text-slate-300">{p.price}</span>
                   </div>
-                  <p className="text-xs text-slate-400 leading-relaxed min-h-[40px] line-clamp-2">
-                    {p.description}
-                  </p>
-                </div>
 
-                <div className="flex items-center justify-between border-t border-white/5 pt-4 mt-5">
-                  <div className="flex items-center gap-4 text-[11px] text-slate-500">
-                    <div>
-                      <span className="text-slate-300 font-mono font-semibold">{p.clientCount}</span> clients
+                  {/* Footer metadata */}
+                  <div className="flex items-center justify-between border-t border-white/5 pt-3.5 mt-5 text-[10px] text-slate-500 font-mono">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-slate-600" />
+                      <span>Last Heartbeat: <b>{formatHeartbeatTime(p.lastHeartbeat)}</b></span>
                     </div>
-                    <div>
-                      <span className="text-slate-300 font-mono font-semibold">{p.licenseCount}</span> licenses
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-600">•</span>
+                      <span className="text-indigo-400/80 font-sans font-medium">{p.type}</span>
                     </div>
                   </div>
-                  <span className="text-[9px] text-slate-500 font-mono">
-                    Created {new Date(p.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
-              </motion.div>
+                </motion.div>
+              </Link>
             );
           })}
         </div>
       ) : (
-        /* List Mode / Modern Data Table */
-        <motion.div 
-          layout 
-          className="glass-card-no-hover overflow-x-auto rounded-2xl border border-white/5"
-        >
+        /* List Mode Table */
+        <motion.div layout className="glass-card-no-hover overflow-x-auto rounded-2xl border border-white/5">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.01] text-slate-400 font-medium select-none">
-                <th className="p-4">Product</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Price</th>
-                <th className="p-4">Licenses Issued</th>
-                <th className="p-4">Registered Clients</th>
-                <th className="p-4">Date Added</th>
+                <th className="p-4">Application name</th>
+                <th className="p-4">Type</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Version</th>
+                <th className="p-4">Active Users</th>
+                <th className="p-4">Licenses</th>
+                <th className="p-4">Health Score</th>
+                <th className="p-4">Last Sync</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-slate-300">
-              {filteredProducts.map((p) => (
-                <tr key={p.id} className="hover:bg-white/[0.01] transition-colors">
-                  <td className="p-4 flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400">
-                      {React.createElement(iconMap[p.icon] || Package, { className: 'w-4 h-4' })}
-                    </div>
-                    <div>
-                      <span className="font-semibold text-white block">{p.name}</span>
-                      <span className="text-[10px] text-slate-500 block truncate max-w-[200px]">{p.description}</span>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-[10px] text-slate-400 border border-white/5 bg-white/[0.02] px-2 py-0.5 rounded">
-                      {p.category}
-                    </span>
-                  </td>
-                  <td className="p-4 font-mono font-bold text-slate-200">{p.price}</td>
-                  <td className="p-4 font-mono">{p.licenseCount}</td>
-                  <td className="p-4 font-mono">{p.clientCount}</td>
-                  <td className="p-4 text-slate-500 font-mono">
-                    {new Date(p.createdAt).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
+              {filteredProducts.map((p) => {
+                const productLicenses = licenses.filter((l) => l.productId === p.productId);
+                return (
+                  <tr key={p.productId} className="hover:bg-white/[0.01] transition-colors cursor-pointer">
+                    <td className="p-4">
+                      <Link href={`/dashboard/products/${p.productId}`} className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/10 flex items-center justify-center text-indigo-400">
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-white block hover:underline">{p.name}</span>
+                          <span className="text-[10px] text-slate-500 font-mono block">ID: {p.productId}</span>
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="p-4">
+                      <span className="text-[10px] text-slate-400 border border-white/5 bg-white/[0.02] px-2 py-0.5 rounded">
+                        {p.type}
+                      </span>
+                    </td>
+                    <td className="p-4">{getStatusBadge(p.status)}</td>
+                    <td className="p-4 font-mono font-medium text-slate-400">v{p.version}</td>
+                    <td className="p-4 font-mono font-semibold">{p.activeUsers}</td>
+                    <td className="p-4 font-mono font-semibold">{productLicenses.length}</td>
+                    <td className="p-4 font-mono">
+                      <span className={p.healthScore >= 90 ? 'text-emerald-400' : (p.healthScore >= 70 ? 'text-amber-400' : 'text-rose-500')}>
+                        {p.healthScore}%
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-500 font-mono">
+                      {formatHeartbeatTime(p.lastHeartbeat)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </motion.div>
@@ -254,7 +372,7 @@ export default function ProductsPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={handleCloseModal}
               className="fixed inset-0 bg-black/80 backdrop-blur-sm"
             />
 
@@ -266,129 +384,114 @@ export default function ProductsPage() {
               className="relative w-full max-w-md bg-[#090d16] border border-white/10 rounded-2xl shadow-2xl p-6 overflow-hidden z-10"
             >
               <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                <h3 className="text-base font-semibold text-slate-200">Register New Product</h3>
+                <h3 className="text-base font-semibold text-slate-200">
+                  {step === 'input' ? 'Register SaaS Asset' : 'Credentials Provisioned'}
+                </h3>
                 <button
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="p-1 rounded hover:bg-white/5 border border-white/5 text-slate-500 hover:text-white"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              <form onSubmit={handleAddProduct} className="mt-4 space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Product Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. SupaAuth Gateway"
-                    className="w-full glass-input text-xs"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Description</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Brief details about capabilities or billing tiers."
-                    className="w-full glass-input text-xs resize-none"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+              {step === 'input' ? (
+                <form onSubmit={handleCreateProduct} className="mt-4 space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Category</label>
+                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Product Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. SupaAuth Gateway"
+                      className="w-full glass-input text-xs"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Application Type</label>
                     <select
                       className="w-full bg-[#030712] border border-white/8 rounded-xl p-2.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
+                      value={type}
+                      onChange={(e) => setType(e.target.value as any)}
                     >
-                      <option value="Security">Security</option>
-                      <option value="Analytics">Analytics</option>
-                      <option value="Productivity">Productivity</option>
-                      <option value="Finance">Finance</option>
-                      <option value="Infrastructure">Infrastructure</option>
+                      <option value="SaaS Application">SaaS Application</option>
+                      <option value="REST API">REST API</option>
+                      <option value="Internal Platform">Internal Platform</option>
+                      <option value="Enterprise Software">Enterprise Software</option>
+                      <option value="Cloud Service">Cloud Service</option>
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Price / Rate</label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3.5 top-2.5 text-xs text-slate-500 font-mono select-none">$</span>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          placeholder="99"
-                          className="w-full glass-input pl-8 text-xs font-mono"
-                          value={priceAmount}
-                          onChange={(e) => setPriceAmount(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex bg-[#030712] border border-white/8 rounded-xl p-1 items-center">
-                        <button
-                          type="button"
-                          onClick={() => setPriceInterval('mo')}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-all ${
-                            priceInterval === 'mo'
-                              ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/10'
-                              : 'text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          Mo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPriceInterval('yr')}
-                          className={`px-3 py-1 rounded-lg text-[10px] font-semibold transition-all ${
-                            priceInterval === 'yr'
-                              ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/10'
-                              : 'text-slate-500 hover:text-slate-300'
-                          }`}
-                        >
-                          Yr
-                        </button>
-                      </div>
+                  <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/5 mt-6">
+                    <button
+                      type="button"
+                      onClick={handleCloseModal}
+                      className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-transparent hover:bg-white/5"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="glass-button-primary px-4 py-2 text-xs font-semibold cursor-pointer"
+                    >
+                      Provision Credentials
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="mt-4 space-y-5">
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex gap-2.5 text-emerald-400 text-xs leading-normal">
+                    <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold block mb-0.5">Asset Created Successfully</span>
+                      <span>Integrate this product into your codebase using the secrets below. They can also be accessed later from the product details panel.</span>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Asset Icon</label>
-                  <select
-                    className="w-full bg-[#030712] border border-white/8 rounded-xl p-2.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-                    value={icon}
-                    onChange={(e) => setIcon(e.target.value)}
-                  >
-                    <option value="Package">Standard Box</option>
-                    <option value="ShieldAlert">Shield (Security)</option>
-                    <option value="Activity">Pulse (Analytics)</option>
-                    <option value="RefreshCw">Sync (Productivity)</option>
-                    <option value="CreditCard">Card (Finance)</option>
-                  </select>
-                </div>
+                  {/* API Key */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-[10px] uppercase font-mono tracking-wider text-slate-400">
+                      <span>API KEY (Client Secret)</span>
+                      <button
+                        onClick={() => handleCopyText(createdKeys?.apiKey || '', 'api')}
+                        className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1"
+                      >
+                        {copiedKey === 'api' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        Copy
+                      </button>
+                    </div>
+                    <div className="bg-[#030712] border border-white/5 rounded-xl p-3 font-mono text-xs text-slate-300 break-all select-all">
+                      {createdKeys?.apiKey}
+                    </div>
+                  </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/5 mt-6">
+                  {/* SDK Secret */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center text-[10px] uppercase font-mono tracking-wider text-slate-400">
+                      <span>SDK SECRET (Server Secret)</span>
+                      <button
+                        onClick={() => handleCopyText(createdKeys?.secret || '', 'secret')}
+                        className="text-[10px] text-indigo-400 hover:underline flex items-center gap-1"
+                      >
+                        {copiedKey === 'secret' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        Copy
+                      </button>
+                    </div>
+                    <div className="bg-[#030712] border border-white/5 rounded-xl p-3 font-mono text-xs text-slate-300 break-all select-all">
+                      {createdKeys?.secret}
+                    </div>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white border border-transparent hover:bg-white/5"
+                    onClick={handleCloseModal}
+                    className="w-full glass-button-primary py-2.5 mt-4 text-xs font-semibold cursor-pointer"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="glass-button-primary px-4 py-2 text-xs font-semibold cursor-pointer"
-                  >
-                    Add Product
+                    Go to Dashboard Catalog
                   </button>
                 </div>
-              </form>
+              )}
             </motion.div>
           </div>
         )}
